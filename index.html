@@ -1,0 +1,1147 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Market Sentinel · 市场监控台</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500;600&family=IBM+Plex+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#060810;--bg2:#0d1117;--bg3:#111827;--bg4:#1a2233;
+  --border:#1e2d45;--border2:#243450;
+  --amber:#f5a623;--amber2:#ffd166;--amber3:#7a4f10;
+  --green:#00d68f;--green2:#00ff9d;--green3:#003d25;
+  --red:#ff4757;--red2:#ff6b7a;--red3:#3d0a0f;
+  --blue:#3d9cf0;--blue2:#5bb3ff;--blue3:#0a2540;
+  --white:#e8eaf0;--muted:#5a6a80;--dim:#3a4a5e;
+  --mono:'IBM Plex Mono',monospace;
+  --sans:'IBM Plex Sans',sans-serif;
+}
+body{background:var(--bg);color:var(--white);font-family:var(--mono);font-size:13px;min-height:100vh;overflow-x:hidden}
+::-webkit-scrollbar{width:4px;height:4px}
+::-webkit-scrollbar-track{background:var(--bg2)}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px}
+
+/* SCANLINES EFFECT */
+body::before{content:'';position:fixed;inset:0;background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,.03) 2px,rgba(0,0,0,.03) 4px);pointer-events:none;z-index:9999}
+
+/* HEADER */
+.header{background:var(--bg2);border-bottom:1px solid var(--border);padding:0 20px;display:flex;align-items:center;gap:0;position:sticky;top:0;z-index:100;height:48px}
+.logo{font-size:14px;font-weight:600;letter-spacing:3px;color:var(--amber);padding-right:20px;border-right:1px solid var(--border);white-space:nowrap}
+.logo span{color:var(--muted);font-weight:300}
+.header-stats{display:flex;align-items:center;gap:0;flex:1;overflow-x:auto;scrollbar-width:none}
+.header-stats::-webkit-scrollbar{display:none}
+.hstat{padding:0 16px;border-right:1px solid var(--border);white-space:nowrap;flex-shrink:0}
+.hstat-label{color:var(--muted);font-size:10px;letter-spacing:1px;margin-bottom:2px}
+.hstat-val{font-size:13px;font-weight:500}
+.hstat-val.pos{color:var(--green)}
+.hstat-val.neg{color:var(--red)}
+.hstat-val.amber{color:var(--amber)}
+.hstat-val.neutral{color:var(--muted)}
+.market-status{padding:2px 8px;border-radius:2px;font-size:10px;letter-spacing:1px;font-weight:500}
+.market-status.open{background:var(--green3);color:var(--green);border:1px solid var(--green3)}
+.market-status.closed{background:var(--bg4);color:var(--muted);border:1px solid var(--border)}
+.header-right{margin-left:auto;display:flex;align-items:center;gap:10px;padding-left:16px;flex-shrink:0}
+.btn{padding:5px 12px;border:1px solid var(--border2);background:transparent;color:var(--white);font-family:var(--mono);font-size:11px;cursor:pointer;border-radius:2px;transition:all .15s;letter-spacing:.5px;white-space:nowrap}
+.btn:hover{border-color:var(--amber);color:var(--amber)}
+.btn.primary{border-color:var(--amber);color:var(--amber)}
+.btn.primary:hover{background:var(--amber3)}
+.btn.danger{border-color:var(--red);color:var(--red)}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+.last-update{font-size:10px;color:var(--muted);letter-spacing:.5px}
+
+/* TABS */
+.tabs{display:flex;background:var(--bg2);border-bottom:1px solid var(--border);padding:0 20px;overflow-x:auto;scrollbar-width:none}
+.tabs::-webkit-scrollbar{display:none}
+.tab{padding:12px 16px;border-bottom:2px solid transparent;cursor:pointer;font-size:11px;letter-spacing:1px;color:var(--muted);white-space:nowrap;transition:all .15s;border-left:none;border-right:none;border-top:none;background:transparent;font-family:var(--mono)}
+.tab:hover{color:var(--white)}
+.tab.active{color:var(--amber);border-bottom-color:var(--amber)}
+.tab-badge{display:inline-flex;align-items:center;justify-content:center;background:var(--amber3);color:var(--amber);width:16px;height:16px;border-radius:2px;font-size:9px;font-weight:600;margin-left:5px}
+
+/* CONTENT */
+.content{padding:16px 20px}
+
+/* SECTION HEADERS */
+.section-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px}
+.section-title{font-size:10px;letter-spacing:2px;color:var(--muted);font-weight:500;display:flex;align-items:center;gap:8px}
+.section-title::before{content:'';width:3px;height:14px;background:var(--amber);display:block}
+
+/* TOOLBAR */
+.toolbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px}
+.filter-btn{padding:3px 10px;border:1px solid var(--border);background:transparent;color:var(--muted);font-family:var(--mono);font-size:10px;cursor:pointer;border-radius:2px;transition:all .15s;letter-spacing:.5px}
+.filter-btn:hover{border-color:var(--border2);color:var(--white)}
+.filter-btn.active{border-color:var(--amber);color:var(--amber);background:var(--amber3)}
+.input{background:var(--bg3);border:1px solid var(--border);color:var(--white);font-family:var(--mono);font-size:11px;padding:5px 10px;border-radius:2px;outline:none;transition:border .15s}
+.input:focus{border-color:var(--blue)}
+.input::placeholder{color:var(--muted)}
+
+/* WATCHLIST TABLE */
+.table-wrap{overflow-x:auto;border:1px solid var(--border);border-radius:2px}
+table{width:100%;border-collapse:collapse}
+thead th{background:var(--bg3);color:var(--muted);font-size:10px;letter-spacing:1px;padding:8px 10px;text-align:left;border-bottom:1px solid var(--border);white-space:nowrap;font-weight:500;cursor:pointer;user-select:none}
+thead th:hover{color:var(--white)}
+tbody tr{border-bottom:1px solid var(--border);transition:background .1s}
+tbody tr:hover{background:var(--bg3)}
+tbody tr:last-child{border-bottom:none}
+td{padding:7px 10px;white-space:nowrap;vertical-align:middle}
+.ticker-cell{font-weight:600;font-size:12px;color:var(--white);letter-spacing:.5px}
+.cat-badge{display:inline-block;padding:1px 6px;border-radius:2px;font-size:9px;letter-spacing:.5px;font-weight:500}
+.cat-Mag7{background:#2a1f5e;color:#a78bfa}
+.cat-Big{background:var(--blue3);color:var(--blue2)}
+.cat-Small{background:#1a2e1a;color:#86efac}
+.cat-coin{background:#2e1a00;color:var(--amber2)}
+.cat-DI{background:#1e1a2e;color:#c084fc}
+.cat-Custom{background:var(--bg4);color:var(--muted)}
+.price-cell{font-weight:500;font-size:12px;color:var(--white)}
+.change-pos{color:var(--green);font-weight:500}
+.change-neg{color:var(--red);font-weight:500}
+.tgt-cell{color:var(--blue2);cursor:pointer}
+.tgt-cell:hover{color:var(--amber)}
+.tgt-near{color:var(--amber);font-weight:600}
+.tgt-none{color:var(--dim)}
+.status-badge{display:inline-block;padding:1px 7px;border-radius:2px;font-size:10px}
+.s-strong{background:#0f2f1e;color:var(--green)}
+.s-below50{background:var(--blue3);color:var(--blue2)}
+.s-below180{background:#2a1800;color:var(--amber)}
+.s-below250{background:var(--red3);color:var(--red2)}
+.alert-count{color:var(--amber);font-size:11px}
+.vol-badge{display:inline-block;padding:1px 7px;font-size:10px;border-radius:2px;background:var(--red3);color:var(--red2)}
+.normal-badge{color:var(--dim);font-size:10px}
+.del-btn{padding:2px 7px;border:1px solid var(--dim);background:transparent;color:var(--dim);cursor:pointer;font-size:10px;border-radius:2px;font-family:var(--mono)}
+.del-btn:hover{border-color:var(--red);color:var(--red)}
+.edit-tgt-wrap{display:flex;align-items:center;gap:4px}
+.edit-tgt-input{width:68px;background:var(--bg3);border:1px solid var(--blue);color:var(--white);font-family:var(--mono);font-size:11px;padding:3px 6px;border-radius:2px;outline:none}
+.save-btn{padding:2px 7px;border:1px solid var(--green3);background:var(--green3);color:var(--green);cursor:pointer;font-size:10px;border-radius:2px;font-family:var(--mono)}
+.cancel-btn{padding:2px 7px;border:1px solid var(--dim);background:transparent;color:var(--muted);cursor:pointer;font-size:10px;border-radius:2px;font-family:var(--mono)}
+.ma-val{font-size:10px;color:var(--muted)}
+.above-ma{color:var(--green);font-size:10px}
+.below-ma{color:var(--red);font-size:10px}
+
+/* MARKET TAB */
+.market-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px}
+.card{background:var(--bg2);border:1px solid var(--border);border-radius:2px;padding:16px}
+.card-title{font-size:10px;letter-spacing:2px;color:var(--muted);margin-bottom:12px;display:flex;align-items:center;gap:8px}
+.fg-score{font-size:52px;font-weight:600;line-height:1;margin-bottom:4px}
+.fg-label{font-size:12px;font-weight:500;letter-spacing:1px}
+.fg-bar{height:6px;background:var(--bg4);border-radius:1px;margin:12px 0;overflow:hidden}
+.fg-bar-fill{height:100%;border-radius:1px;transition:width 1s ease}
+.fg-ticks{display:flex;justify-content:space-between;font-size:9px;color:var(--muted)}
+.crypto-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}
+.crypto-item{background:var(--bg3);border:1px solid var(--border);padding:12px;border-radius:2px}
+.crypto-name{font-size:10px;color:var(--muted);letter-spacing:1px;margin-bottom:4px}
+.crypto-price{font-size:20px;font-weight:600;margin-bottom:2px}
+.chart-wrap{position:relative;height:220px;margin-top:10px}
+.fg-legend{display:flex;gap:12px;flex-wrap:wrap;font-size:10px;margin-top:8px}
+.fg-legend-item{display:flex;align-items:center;gap:4px}
+.fg-legend-dot{width:8px;height:8px;border-radius:1px}
+
+/* ALERTS TAB */
+.alert-info{background:var(--bg3);border:1px solid var(--border);padding:12px 16px;border-radius:2px;margin-bottom:12px;font-size:12px;color:var(--muted);line-height:1.8}
+.alert-info strong{color:var(--amber)}
+.alert-row{display:grid;grid-template-columns:130px 60px 80px 1fr 100px 60px;gap:12px;align-items:center;padding:9px 12px;border-bottom:1px solid var(--border);font-size:11px}
+.alert-row:last-child{border-bottom:none}
+.alert-row.header{background:var(--bg3);color:var(--muted);font-size:9px;letter-spacing:1px;border-bottom:1px solid var(--border2)}
+.sent-badge{padding:1px 7px;border-radius:2px;font-size:10px}
+.sent-ok{background:var(--green3);color:var(--green)}
+.sent-fail{background:var(--red3);color:var(--red2)}
+.empty-state{text-align:center;padding:60px 20px;color:var(--muted)}
+.empty-state .icon{font-size:32px;margin-bottom:12px;color:var(--dim)}
+.empty-state .sub{font-size:11px;margin-top:6px;line-height:1.8}
+
+/* SETTINGS TAB */
+.settings-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.setting-card{background:var(--bg2);border:1px solid var(--border);border-radius:2px;padding:16px}
+.setting-title{font-size:10px;letter-spacing:2px;color:var(--muted);margin-bottom:14px;display:flex;align-items:center;gap:8px}
+.setting-title::before{content:'';width:3px;height:10px;background:var(--amber)}
+.setting-row{margin-bottom:12px}
+.setting-label{font-size:11px;color:var(--muted);margin-bottom:5px;letter-spacing:.5px}
+.setting-note{font-size:10px;color:var(--dim);margin-top:6px;line-height:1.7}
+.setting-note .ok{color:var(--green)}
+.setting-note .warn{color:var(--amber)}
+.setting-note .no{color:var(--red)}
+.msg-flash{padding:5px 12px;border-radius:2px;font-size:11px;font-weight:500}
+.msg-ok{background:var(--green3);color:var(--green);border:1px solid var(--green3)}
+.msg-err{background:var(--red3);color:var(--red2);border:1px solid var(--red3)}
+.deploy-item{display:flex;align-items:flex-start;gap:8px;padding:6px 0;border-bottom:1px solid var(--border);font-size:11px;line-height:1.7}
+.deploy-item:last-child{border-bottom:none}
+.deploy-tag{min-width:50px;font-size:9px;padding:2px 6px;border-radius:2px;letter-spacing:.5px;font-weight:500;text-align:center;flex-shrink:0;margin-top:2px}
+.tag-free{background:var(--green3);color:var(--green)}
+.tag-no{background:var(--red3);color:var(--red2)}
+.tag-note{background:var(--bg4);color:var(--muted)}
+.deploy-detail{color:var(--muted);font-size:10px;margin-top:2px}
+
+/* TOAST */
+.toast-wrap{position:fixed;top:60px;right:20px;display:flex;flex-direction:column;gap:6px;z-index:9998}
+.toast{background:var(--bg3);border:1px solid var(--amber);color:var(--amber);padding:10px 14px;border-radius:2px;font-size:12px;max-width:300px;line-height:1.5;animation:slideIn .3s ease}
+.toast.error{border-color:var(--red);color:var(--red2)}
+.toast.success{border-color:var(--green);color:var(--green)}
+@keyframes slideIn{from{transform:translateX(20px);opacity:0}to{transform:translateX(0);opacity:1}}
+
+/* VOL PROGRESS */
+.vol-progress{font-size:10px;color:var(--muted);letter-spacing:.5px;padding:4px 0;animation:pulse 1.5s infinite}
+@keyframes pulse{0%,100%{opacity:.5}50%{opacity:1}}
+
+/* LOADING */
+.loading-bar{height:2px;background:linear-gradient(90deg,transparent,var(--amber),transparent);background-size:200% 100%;animation:loading 1.2s linear infinite;margin-bottom:12px}
+@keyframes loading{0%{background-position:200% 0}100%{background-position:-200% 0}}
+
+/* RESPONSIVE */
+@media(max-width:700px){
+  .market-grid,.settings-grid{grid-template-columns:1fr}
+  .header{padding:0 12px}
+  .content{padding:12px}
+  .hstat{padding:0 10px}
+  .alert-row{grid-template-columns:1fr 1fr;font-size:10px}
+}
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<div class="header">
+  <div class="logo">MARKET<span>SENTINEL</span></div>
+  <div class="header-stats" id="headerStats">
+    <div class="hstat">
+      <div class="hstat-label">STATUS</div>
+      <div id="mktStatus"><span class="market-status closed" id="mktStatusBadge">CLOSED</span></div>
+    </div>
+    <div class="hstat">
+      <div class="hstat-label">BTC/USD</div>
+      <div class="hstat-val amber" id="btcVal">—</div>
+    </div>
+    <div class="hstat">
+      <div class="hstat-label">ETH/USD</div>
+      <div class="hstat-val amber" id="ethVal">—</div>
+    </div>
+    <div class="hstat">
+      <div class="hstat-label">FEAR&GREED</div>
+      <div class="hstat-val" id="fgVal">—</div>
+    </div>
+    <div class="hstat">
+      <div class="hstat-label">WATCHLIST</div>
+      <div class="hstat-val" id="countVal">—</div>
+    </div>
+    <div class="hstat">
+      <div class="hstat-label">ALERTS TODAY</div>
+      <div class="hstat-val amber" id="alertsToday">0</div>
+    </div>
+  </div>
+  <div class="header-right">
+    <span class="last-update" id="lastUpdate">未刷新</span>
+    <button class="btn primary" id="checkBtn" onclick="doCheck()">⚡ CHECK ALERTS</button>
+    <button class="btn" onclick="doRefresh()">↺ 刷新</button>
+  </div>
+</div>
+
+<!-- TABS -->
+<div class="tabs">
+  <button class="tab active" id="tab-watchlist" onclick="switchTab('watchlist')">WATCHLIST</button>
+  <button class="tab" id="tab-market" onclick="switchTab('market')">MARKET<span class="tab-badge" id="fgBadge">—</span></button>
+  <button class="tab" id="tab-alerts" onclick="switchTab('alerts')">ALERTS<span class="tab-badge" id="alertBadge">0</span></button>
+  <button class="tab" id="tab-settings" onclick="switchTab('settings')">SETTINGS</button>
+</div>
+
+<!-- TOAST CONTAINER -->
+<div class="toast-wrap" id="toastWrap"></div>
+
+<!-- MAIN CONTENT -->
+<div class="content" id="mainContent">
+  <div class="loading-bar" id="loadBar" style="display:none"></div>
+
+  <!-- ═══ WATCHLIST TAB ═══ -->
+  <div id="pane-watchlist">
+    <div class="section-header">
+      <span class="section-title">PORTFOLIO WATCHLIST</span>
+      <div id="volProgress" class="vol-progress" style="display:none"></div>
+    </div>
+    <div class="toolbar">
+      <button class="filter-btn active" data-cat="All" onclick="setFilter('All')">ALL</button>
+      <button class="filter-btn" data-cat="Mag7" onclick="setFilter('Mag7')">MAG7</button>
+      <button class="filter-btn" data-cat="Big" onclick="setFilter('Big')">BIG</button>
+      <button class="filter-btn" data-cat="Small" onclick="setFilter('Small')">SMALL</button>
+      <button class="filter-btn" data-cat="coin" onclick="setFilter('coin')">CRYPTO</button>
+      <button class="filter-btn" data-cat="DI" onclick="setFilter('DI')">DI</button>
+      <button class="filter-btn" data-cat="⚠ALERT" onclick="setFilter('⚠ALERT')">⚠ NEAR TARGET</button>
+      <div style="margin-left:auto;display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+        <input class="input" id="newTicker" placeholder="TICKER" style="width:72px" maxlength="8" oninput="this.value=this.value.toUpperCase()">
+        <input class="input" id="newTarget" placeholder="目标价" style="width:72px" type="number" step="0.01">
+        <button class="btn primary" onclick="addStock()">+ 添加</button>
+        <label class="btn" style="cursor:pointer">
+          📂 Excel导入
+          <input type="file" accept=".xlsx,.xls" style="display:none" onchange="importExcel(this)">
+        </label>
+      </div>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th onclick="sortBy('t')">代码 ↕</th>
+            <th>分类</th>
+            <th onclick="sortBy('price')">现价 ↕</th>
+            <th onclick="sortBy('pct')">涨跌% ↕</th>
+            <th>MA20</th>
+            <th>MA50</th>
+            <th onclick="sortBy('tgt')">目标价 ↕</th>
+            <th>波动率/1σ</th>
+            <th>状态</th>
+            <th>今日预警</th>
+            <th>操作</th>
+          </tr>
+        </thead>
+        <tbody id="watchlistBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ═══ MARKET TAB ═══ -->
+  <div id="pane-market" style="display:none">
+    <div class="section-header">
+      <span class="section-title">MARKET SENTIMENT & CRYPTO</span>
+      <button class="btn" onclick="fetchMarketData()">↺ 刷新市场数据</button>
+    </div>
+    <div class="market-grid">
+      <div class="card">
+        <div class="card-title">CNN FEAR & GREED INDEX</div>
+        <div id="fgDisplay">
+          <div style="color:var(--muted);font-size:12px">加载中...</div>
+        </div>
+        <div class="chart-wrap">
+          <canvas id="fgChart"></canvas>
+        </div>
+        <div class="fg-legend">
+          <div class="fg-legend-item"><div class="fg-legend-dot" style="background:#ff4757"></div><span style="color:var(--muted)">极度恐惧 0–25</span></div>
+          <div class="fg-legend-item"><div class="fg-legend-dot" style="background:#f5a623"></div><span style="color:var(--muted)">恐惧 25–45</span></div>
+          <div class="fg-legend-item"><div class="fg-legend-dot" style="background:#e8eaf0"></div><span style="color:var(--muted)">中性 45–55</span></div>
+          <div class="fg-legend-item"><div class="fg-legend-dot" style="background:#00d68f"></div><span style="color:var(--muted)">贪婪 55–75</span></div>
+          <div class="fg-legend-item"><div class="fg-legend-dot" style="background:#00ff9d"></div><span style="color:var(--muted)">极度贪婪 75–100</span></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title">CRYPTO REAL-TIME</div>
+        <div class="crypto-grid">
+          <div class="crypto-item">
+            <div class="crypto-name">BTC / USD</div>
+            <div class="crypto-price amber" id="btcPrice">—</div>
+            <div id="btcChg" style="font-size:11px">—</div>
+            <div style="font-size:10px;color:var(--muted);margin-top:4px" id="btcMcap">—</div>
+          </div>
+          <div class="crypto-item">
+            <div class="crypto-name">ETH / USD</div>
+            <div class="crypto-price amber" id="ethPrice">—</div>
+            <div id="ethChg" style="font-size:11px">—</div>
+            <div style="font-size:10px;color:var(--muted);margin-top:4px" id="ethMcap">—</div>
+          </div>
+        </div>
+        <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border)">
+          <div class="card-title">市场指数快照</div>
+          <div id="indexSnap" style="font-size:11px;color:var(--muted)">刷新中...</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ ALERTS TAB ═══ -->
+  <div id="pane-alerts" style="display:none">
+    <div class="section-header">
+      <span class="section-title">ALERT LOG</span>
+      <div style="display:flex;gap:8px;align-items:center">
+        <span id="alertFlash" style="display:none" class="msg-flash"></span>
+        <button class="btn" onclick="clearAlertLog()">清除记录</button>
+        <button class="btn primary" id="checkBtn2" onclick="doCheck()">⚡ 立即检查</button>
+      </div>
+    </div>
+    <div class="alert-info">
+      <strong>监控规则</strong>：目标价 ±1% 触发 · 无目标价则波动率超 60 日 1σ 触发 · 每只股票每日最多 <strong>3</strong> 次提醒 · 交易时间每 <strong>5</strong> 分钟自动检查<br>
+      <strong>交易时间</strong>：美东 9:30–16:00（ET），周一至周五 · <span id="nextCheckTime" style="color:var(--amber)"></span>
+    </div>
+    <div id="alertContainer">
+      <div class="empty-state">
+        <div class="icon">▣</div>
+        <div>暂无预警记录</div>
+        <div class="sub">点击 ⚡ CHECK ALERTS 立即检查<br>或等待交易时间内自动检测</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ SETTINGS TAB ═══ -->
+  <div id="pane-settings" style="display:none">
+    <div class="section-header"><span class="section-title">SETTINGS</span></div>
+    <div class="settings-grid">
+      <div>
+        <!-- TELEGRAM -->
+        <div class="setting-card" style="margin-bottom:14px">
+          <div class="setting-title">TELEGRAM 推送配置</div>
+          <div class="setting-row">
+            <div class="setting-label">Bot Token</div>
+            <input class="input" id="tgToken" placeholder="1234567890:ABCdefGHI..." style="width:100%" oninput="saveCfg()">
+          </div>
+          <div class="setting-row">
+            <div class="setting-label">Chat ID（你的 User ID 或群组 ID）</div>
+            <input class="input" id="tgChatId" placeholder="123456789 或 -100123456789" style="width:100%" oninput="saveCfg()">
+          </div>
+          <div class="setting-note">
+            <div>1. Telegram 搜索 <strong>@BotFather</strong> → 发 /newbot → 复制 Token</div>
+            <div>2. 给 Bot 发任意一条消息</div>
+            <div>3. 访问 <code>api.telegram.org/bot&lt;TOKEN&gt;/getUpdates</code> 找到 <code>chat.id</code></div>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;margin-top:12px">
+            <button class="btn primary" onclick="testTelegram()">发送测试消息</button>
+            <span id="tgTestResult" style="font-size:11px;display:none"></span>
+          </div>
+        </div>
+
+        <!-- IMESSAGE -->
+        <div class="setting-card">
+          <div class="setting-title">iMESSAGE 提醒方案</div>
+          <div class="setting-note" style="line-height:2">
+            <div><span class="no">✗</span> 网页版无法直接发送 iMessage（需要系统级权限）</div>
+            <div><span class="warn">◎ 方案 A</span>：iPhone 快捷指令 + Webhook 中转</div>
+            <div style="padding-left:16px;color:var(--dim)">① 新建快捷指令 → 接收网络请求 → 发消息</div>
+            <div style="padding-left:16px;color:var(--dim)">② 工具服务如 ntfy.sh 或 Pushover 转发</div>
+            <div><span class="warn">◎ 方案 B</span>：Mac 本地服务器 + AppleScript</div>
+            <div style="padding-left:16px;color:var(--dim)">node server.js 监听 + <code>osascript</code> 调用</div>
+            <div><span class="ok">★ 推荐</span>：使用 Telegram，免费、稳定、支持图片/格式</div>
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <!-- ALERT SETTINGS -->
+        <div class="setting-card" style="margin-bottom:14px">
+          <div class="setting-title">预警参数</div>
+          <div class="setting-row">
+            <div class="setting-label">目标价触发阈值（%）</div>
+            <input class="input" id="cfgThresh" value="1" type="number" min="0.1" max="10" step="0.1" style="width:80px" oninput="saveCfg()">
+            <div class="setting-note">现价距目标价在此范围内触发（默认 1%）</div>
+          </div>
+          <div class="setting-row">
+            <div class="setting-label">每日最大提醒次数</div>
+            <input class="input" id="cfgMaxAlerts" value="3" type="number" min="1" max="20" style="width:80px" oninput="saveCfg()">
+          </div>
+          <div class="setting-row">
+            <div class="setting-label">自动检查间隔（分钟）</div>
+            <input class="input" id="cfgInterval" value="5" type="number" min="1" max="60" style="width:80px" oninput="saveCfg();resetTimer()">
+          </div>
+        </div>
+
+        <!-- DEPLOY GUIDE -->
+        <div class="setting-card">
+          <div class="setting-title">免费部署方案</div>
+          <div>
+            <div class="deploy-item">
+              <span class="deploy-tag tag-free">免费</span>
+              <div>
+                <div><strong>GitHub Pages</strong> — 永久免费静态托管</div>
+                <div class="deploy-detail">1. 新建 repo → 上传 market-sentinel.html 为 index.html<br>2. Settings → Pages → Deploy from main branch<br>3. 访问 <code>username.github.io/repo-name</code></div>
+              </div>
+            </div>
+            <div class="deploy-item">
+              <span class="deploy-tag tag-free">免费</span>
+              <div>
+                <div><strong>Vercel / Netlify</strong> — CI/CD 自动部署</div>
+                <div class="deploy-detail">拖放 HTML 文件即可部署，自动 HTTPS，全球 CDN</div>
+              </div>
+            </div>
+            <div class="deploy-item">
+              <span class="deploy-tag tag-free">免费</span>
+              <div>
+                <div><strong>Cloudflare Pages</strong> — 最快的全球节点</div>
+                <div class="deploy-detail">与 GitHub 连接，push 自动更新，适合中国访问优化</div>
+              </div>
+            </div>
+            <div class="deploy-item">
+              <span class="deploy-tag tag-note">本地</span>
+              <div>
+                <div><strong>双击 HTML 文件</strong> — 离线直接运行</div>
+                <div class="deploy-detail">无需服务器，数据存 localStorage，Telegram 推送正常工作</div>
+              </div>
+            </div>
+            <div class="deploy-item">
+              <span class="deploy-tag tag-no">限制</span>
+              <div>
+                <div><strong>长期自动监控</strong> — 需浏览器保持打开</div>
+                <div class="deploy-detail">纯前端方案无法后台运行。如需真后台：免费 Railway/Render 部署 Node.js 服务 + Telegram Bot 无需前端</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════
+// DATA — Pre-loaded from your Excel
+// ═══════════════════════════════════════════════════
+const INIT_STOCKS=[
+  {t:'SMR',cat:'Small',tgt:null},{t:'MSTR',cat:'coin',tgt:null},{t:'U',cat:'Small',tgt:null},
+  {t:'MARA',cat:'coin',tgt:null},{t:'FIG',cat:'Small',tgt:null},{t:'ACHR',cat:'Small',tgt:null},
+  {t:'ORCL',cat:'Big',tgt:135},{t:'NOW',cat:'Big',tgt:null},{t:'COIN',cat:'coin',tgt:145},
+  {t:'TEM',cat:'Small',tgt:40},{t:'HOOD',cat:'coin',tgt:null},{t:'SAP',cat:'Big',tgt:180},
+  {t:'RGTI',cat:'Small',tgt:null},{t:'CRM',cat:'Big',tgt:null},{t:'ADBE',cat:'Big',tgt:null},
+  {t:'RACE',cat:'DI',tgt:null},{t:'MSFT',cat:'Mag7',tgt:180},{t:'DXYZ',cat:'Small',tgt:null},
+  {t:'PANW',cat:'Small',tgt:140},{t:'NFLX',cat:'Big',tgt:80},{t:'HESAY',cat:'DI',tgt:null},
+  {t:'BLK',cat:'DI',tgt:null},{t:'IBM',cat:'Big',tgt:230},{t:'VST',cat:'Big',tgt:145},
+  {t:'V',cat:'DI',tgt:null},{t:'PLTR',cat:'Big',tgt:130},{t:'ISRG',cat:'DI',tgt:null},
+  {t:'META',cat:'Mag7',tgt:600},{t:'ICE',cat:'DI',tgt:null},{t:'AMZN',cat:'Mag7',tgt:200},
+  {t:'JPM',cat:'DI',tgt:270},{t:'CEG',cat:'Big',tgt:250},{t:'TMUS',cat:'DI',tgt:null},
+  {t:'SCHW',cat:'DI',tgt:null},{t:'CRCL',cat:'coin',tgt:null},{t:'TLT',cat:'DI',tgt:null},
+  {t:'BRK.B',cat:'DI',tgt:null},{t:'TSLA',cat:'Mag7',tgt:380},{t:'T',cat:'DI',tgt:null},
+  {t:'COST',cat:'DI',tgt:null},{t:'NVDA',cat:'Mag7',tgt:160},{t:'IBKR',cat:'DI',tgt:null},
+  {t:'XLV',cat:'DI',tgt:140},{t:'MCD',cat:'DI',tgt:300},{t:'AAPL',cat:'Mag7',tgt:225},
+  {t:'AVGO',cat:'Big',tgt:300},{t:'MP',cat:'Small',tgt:null},{t:'PFE',cat:'DI',tgt:null},
+  {t:'AMD',cat:'Big',tgt:170},{t:'KO',cat:'DI',tgt:68},{t:'CME',cat:'DI',tgt:null},
+  {t:'WMT',cat:'DI',tgt:null},{t:'HSBC',cat:'DI',tgt:null},{t:'GOOGL',cat:'Mag7',tgt:256},
+  {t:'RTX',cat:'DI',tgt:null},{t:'TSM',cat:'Big',tgt:260},{t:'RKLB',cat:'Small',tgt:null},
+  {t:'GLD',cat:'DI',tgt:null},{t:'LMT',cat:'DI',tgt:null},{t:'ASML',cat:'Big',tgt:null},
+  {t:'INTC',cat:'Big',tgt:null},{t:'RCAT',cat:'Small',tgt:null},{t:'AMAT',cat:'Big',tgt:null},
+  {t:'MU',cat:'Big',tgt:null}
+];
+
+// ═══════════════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════════════
+let stocks=[];
+let priceData={};   // {AAPL:{price,change,pct,ma20,ma50}}
+let volData={};     // {AAPL: std_dev_pct}
+let alertLog=[];    // [{id,time,ticker,price,reason,sent}]
+let alertCounts={}; // {date:{AAPL:2}}
+let cfg={tok:'',cid:'',thresh:1,maxAlerts:3,interval:5};
+let fgHistory=[];
+let fgChart=null;
+let currentFilter='All';
+let sortKey='t';
+let sortDir=1;
+let volWorkerActive=false;
+let checkTimer=null;
+let volProgress=0;
+
+function loadState(){
+  try{
+    const s=localStorage.getItem('ms_stocks');
+    stocks=s?JSON.parse(s):JSON.parse(JSON.stringify(INIT_STOCKS));
+    const p=localStorage.getItem('ms_prices');
+    if(p)priceData=JSON.parse(p);
+    const v=localStorage.getItem('ms_vol');
+    if(v)volData=JSON.parse(v);
+    const a=localStorage.getItem('ms_alerts');
+    if(a)alertLog=JSON.parse(a);
+    const c=localStorage.getItem('ms_counts');
+    if(c)alertCounts=JSON.parse(c);
+    const g=localStorage.getItem('ms_cfg');
+    if(g)cfg={...cfg,...JSON.parse(g)};
+  }catch(e){stocks=JSON.parse(JSON.stringify(INIT_STOCKS))}
+  document.getElementById('tgToken').value=cfg.tok||'';
+  document.getElementById('tgChatId').value=cfg.cid||'';
+  document.getElementById('cfgThresh').value=cfg.thresh||1;
+  document.getElementById('cfgMaxAlerts').value=cfg.maxAlerts||3;
+  document.getElementById('cfgInterval').value=cfg.interval||5;
+}
+
+function saveState(){
+  localStorage.setItem('ms_stocks',JSON.stringify(stocks));
+  localStorage.setItem('ms_alerts',JSON.stringify(alertLog));
+  localStorage.setItem('ms_counts',JSON.stringify(alertCounts));
+}
+
+function saveCfg(){
+  cfg.tok=document.getElementById('tgToken').value.trim();
+  cfg.cid=document.getElementById('tgChatId').value.trim();
+  cfg.thresh=parseFloat(document.getElementById('cfgThresh').value)||1;
+  cfg.maxAlerts=parseInt(document.getElementById('cfgMaxAlerts').value)||3;
+  cfg.interval=parseInt(document.getElementById('cfgInterval').value)||5;
+  localStorage.setItem('ms_cfg',JSON.stringify(cfg));
+}
+
+// ═══════════════════════════════════════════════════
+// MARKET HOURS
+// ═══════════════════════════════════════════════════
+function isMarketOpen(){
+  const et=new Date().toLocaleString('en-US',{timeZone:'America/New_York'});
+  const d=new Date(et);
+  const day=d.getDay(),h=d.getHours(),m=d.getMinutes();
+  const mins=h*60+m;
+  return day>=1&&day<=5&&mins>=570&&mins<960;
+}
+function updateMarketStatus(){
+  const open=isMarketOpen();
+  const b=document.getElementById('mktStatusBadge');
+  b.textContent=open?'● OPEN':'○ CLOSED';
+  b.className='market-status '+(open?'open':'closed');
+  const nc=document.getElementById('nextCheckTime');
+  if(checkTimer&&open){nc.textContent='下次检查: '+new Date(Date.now()+cfg.interval*60000).toLocaleTimeString('zh-CN')}
+  else if(!open){nc.textContent='市场已收盘，自动监控暂停'}
+}
+
+// ═══════════════════════════════════════════════════
+// PRICE FETCH (via CORS proxy)
+// ═══════════════════════════════════════════════════
+const PROXY='https://corsproxy.io/?';
+const PROXY2='https://api.allorigins.win/get?url=';
+
+async function fetchWithProxy(url){
+  const attempts=[
+    ()=>fetch(PROXY+encodeURIComponent(url)).then(r=>r.text()),
+    ()=>fetch(PROXY2+encodeURIComponent(url)).then(r=>r.json()).then(d=>d.contents),
+  ];
+  for(const fn of attempts){
+    try{const r=await fn();if(r)return r;}catch{}
+  }
+  return null;
+}
+
+async function fetchPrices(tickers){
+  // batch of max 20
+  const results={};
+  const batches=[];
+  for(let i=0;i<tickers.length;i+=20)batches.push(tickers.slice(i,i+20));
+  for(const batch of batches){
+    try{
+      const url=`https://query1.finance.yahoo.com/v7/finance/quote?symbols=${batch.join(',')}&fields=regularMarketPrice,regularMarketChange,regularMarketChangePercent`;
+      const raw=await fetchWithProxy(url);
+      if(!raw)continue;
+      const data=JSON.parse(raw);
+      const quotes=data?.quoteResponse?.result||[];
+      for(const q of quotes){
+        results[q.symbol]={
+          price:q.regularMarketPrice,
+          change:q.regularMarketChange,
+          pct:q.regularMarketChangePercent
+        };
+      }
+    }catch(e){console.warn('price batch fail',e)}
+  }
+  return results;
+}
+
+async function fetchHistory60(ticker){
+  try{
+    const url=`https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1d&range=4mo`;
+    const raw=await fetchWithProxy(url);
+    if(!raw)return null;
+    const data=JSON.parse(raw);
+    const closes=data?.chart?.result?.[0]?.indicators?.quote?.[0]?.close?.filter(v=>v!=null)||[];
+    return closes.slice(-60);
+  }catch{return null}
+}
+
+function calcStdDev(closes){
+  if(!closes||closes.length<10)return null;
+  const returns=[];
+  for(let i=1;i<closes.length;i++){
+    if(closes[i-1]>0)returns.push((closes[i]-closes[i-1])/closes[i-1]*100);
+  }
+  if(returns.length<5)return null;
+  const mean=returns.reduce((a,b)=>a+b,0)/returns.length;
+  const variance=returns.reduce((a,b)=>a+(b-mean)**2,0)/(returns.length-1);
+  return Math.sqrt(variance);
+}
+
+// ═══════════════════════════════════════════════════
+// CRYPTO & MARKET DATA
+// ═══════════════════════════════════════════════════
+async function fetchCrypto(){
+  try{
+    const r=await fetch('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum&vs_currencies=usd&include_24hr_change=true&include_market_cap=true');
+    const d=await r.json();
+    const btc=d.bitcoin,eth=d.ethereum;
+    // Header
+    const bp=document.getElementById('btcVal'),ep=document.getElementById('ethVal');
+    bp.textContent='$'+fmt(btc.usd);
+    bp.className='hstat-val '+(btc.usd_24h_change>=0?'pos':'neg');
+    ep.textContent='$'+fmt(eth.usd);
+    ep.className='hstat-val '+(eth.usd_24h_change>=0?'pos':'neg');
+    // Market tab
+    document.getElementById('btcPrice').textContent='$'+fmt(btc.usd);
+    document.getElementById('btcChg').innerHTML=`<span class="${btc.usd_24h_change>=0?'change-pos':'change-neg'}">${btc.usd_24h_change>=0?'▲':'▼'} ${Math.abs(btc.usd_24h_change).toFixed(2)}%</span> <span style="color:var(--muted)">24H</span>`;
+    document.getElementById('btcMcap').textContent='市值: $'+fmtB(btc.usd_market_cap);
+    document.getElementById('ethPrice').textContent='$'+fmt(eth.usd);
+    document.getElementById('ethChg').innerHTML=`<span class="${eth.usd_24h_change>=0?'change-pos':'change-neg'}">${eth.usd_24h_change>=0?'▲':'▼'} ${Math.abs(eth.usd_24h_change).toFixed(2)}%</span> <span style="color:var(--muted)">24H</span>`;
+    document.getElementById('ethMcap').textContent='市值: $'+fmtB(eth.usd_market_cap);
+  }catch(e){console.warn('crypto fail',e)}
+}
+
+async function fetchFearGreed(){
+  try{
+    const r=await fetch('https://api.alternative.me/fng/?limit=30');
+    const d=await r.json();
+    fgHistory=(d.data||[]).slice().reverse();
+    renderFG();
+  }catch(e){console.warn('FG fail',e)}
+}
+
+function renderFG(){
+  if(!fgHistory.length)return;
+  const cur=fgHistory[fgHistory.length-1];
+  const v=parseInt(cur.value);
+  const color=fgColor(v);
+  document.getElementById('fgDisplay').innerHTML=`
+    <div class="fg-score" style="color:${color}">${v}</div>
+    <div class="fg-label" style="color:${color}">${fgLabel(v)}</div>
+    <div class="fg-bar"><div class="fg-bar-fill" style="width:${v}%;background:${color}"></div></div>
+    <div class="fg-ticks"><span>极度恐惧</span><span>恐惧</span><span>中性</span><span>贪婪</span><span>极度贪婪</span></div>
+  `;
+  document.getElementById('fgVal').textContent=v+' '+fgLabel(v);
+  document.getElementById('fgVal').style.color=color;
+  document.getElementById('fgBadge').textContent=v;
+  document.getElementById('fgBadge').style.background=fgBadgeBg(v);
+  document.getElementById('fgBadge').style.color=color;
+  renderFGChart();
+}
+
+function renderFGChart(){
+  const labels=fgHistory.map(d=>new Date(parseInt(d.timestamp)*1000).toLocaleDateString('zh-CN',{month:'numeric',day:'numeric'}));
+  const vals=fgHistory.map(d=>parseInt(d.value));
+  const colors=vals.map(v=>fgColor(v));
+  if(fgChart){fgChart.destroy();fgChart=null}
+  fgChart=new Chart(document.getElementById('fgChart'),{
+    type:'line',
+    data:{
+      labels,
+      datasets:[{
+        data:vals,
+        borderColor:'rgba(245,166,35,0.6)',
+        backgroundColor:'rgba(245,166,35,0.06)',
+        borderWidth:1.5,
+        pointBackgroundColor:colors,
+        pointRadius:3,
+        pointHoverRadius:5,
+        fill:true,
+        tension:0.3
+      }]
+    },
+    options:{
+      responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false},tooltip:{
+        backgroundColor:'#111827',borderColor:'#1e2d45',borderWidth:1,
+        titleColor:'#5a6a80',bodyColor:'#e8eaf0',
+        callbacks:{label:ctx=>`F&G: ${ctx.raw} — ${fgLabel(ctx.raw)}`}
+      }},
+      scales:{
+        x:{ticks:{color:'#3a4a5e',font:{size:9},maxRotation:0,autoSkip:true,maxTicksLimit:8},grid:{color:'rgba(30,45,69,.5)'},border:{color:'#1e2d45'}},
+        y:{min:0,max:100,ticks:{color:'#3a4a5e',font:{size:9}},grid:{color:'rgba(30,45,69,.5)'},border:{color:'#1e2d45'}}
+      }
+    }
+  });
+}
+
+function fgColor(v){return v>=75?'#00ff9d':v>=55?'#00d68f':v>=45?'#e8eaf0':v>=25?'#f5a623':'#ff4757'}
+function fgLabel(v){return v>=75?'极度贪婪':v>=55?'贪婪':v>=45?'中性':v>=25?'恐惧':'极度恐惧'}
+function fgBadgeBg(v){return v>=55?'rgba(0,214,143,.1)':v>=45?'rgba(232,234,240,.05)':'rgba(255,71,87,.15)'}
+
+// ═══════════════════════════════════════════════════
+// MAIN REFRESH
+// ═══════════════════════════════════════════════════
+async function doRefresh(){
+  setLoading(true);
+  const tickers=stocks.map(s=>s.t);
+  const newPrices=await fetchPrices(tickers);
+  // merge
+  for(const [k,v] of Object.entries(newPrices))priceData[k]=v;
+  localStorage.setItem('ms_prices',JSON.stringify(priceData));
+  const now=new Date();
+  document.getElementById('lastUpdate').textContent=now.toLocaleTimeString('zh-CN');
+  document.getElementById('countVal').textContent=stocks.length+' 只';
+  updateMarketStatus();
+  renderWatchlist();
+  renderAlertCount();
+  setLoading(false);
+  return newPrices;
+}
+
+// ═══════════════════════════════════════════════════
+// VOLATILITY CALCULATOR (background)
+// ═══════════════════════════════════════════════════
+async function calcVolatility(){
+  if(volWorkerActive)return;
+  volWorkerActive=true;
+  const noTgt=stocks.filter(s=>!s.tgt&&!volData[s.t]);
+  const total=noTgt.length;
+  for(let i=0;i<noTgt.length;i++){
+    const s=noTgt[i];
+    const pg=document.getElementById('volProgress');
+    if(pg){pg.style.display='block';pg.textContent=`计算波动率 ${i+1}/${total}: ${s.t}...`}
+    const closes=await fetchHistory60(s.t);
+    if(closes){
+      const sd=calcStdDev(closes);
+      if(sd)volData[s.t]=sd;
+    }
+    await delay(500);
+  }
+  localStorage.setItem('ms_vol',JSON.stringify(volData));
+  const pg=document.getElementById('volProgress');
+  if(pg)pg.style.display='none';
+  volWorkerActive=false;
+  renderWatchlist();
+}
+
+// ═══════════════════════════════════════════════════
+// ALERT CHECK
+// ═══════════════════════════════════════════════════
+async function doCheck(){
+  document.getElementById('checkBtn').disabled=true;
+  document.getElementById('checkBtn').textContent='检查中...';
+  try{
+    const newP=await doRefresh();
+    const today=getToday();
+    if(!alertCounts[today])alertCounts[today]={};
+    let fired=0;
+    const msgs=[];
+    for(const stock of stocks){
+      const tk=stock.t;
+      const pd=priceData[tk];
+      if(!pd)continue;
+      const dayCount=alertCounts[today][tk]||0;
+      if(dayCount>=cfg.maxAlerts)continue;
+      let trigger=false,reason='',dir='';
+      if(stock.tgt){
+        const dist=Math.abs(pd.price-stock.tgt)/stock.tgt*100;
+        if(dist<=cfg.thresh){
+          trigger=true;
+          dir=pd.price<stock.tgt?'📉':'📈';
+          reason=`${dir} 接近目标价 $${stock.tgt}（现价 $${fmtP(pd.price)}，距离 ${dist.toFixed(2)}%）`;
+        }
+      }else if(volData[tk]){
+        if(Math.abs(pd.pct)>volData[tk]){
+          trigger=true;
+          dir=pd.pct>0?'🚀':'⚠️';
+          reason=`${dir} ${pd.pct>0?'异常上涨':'异常下跌'} ${pd.pct>0?'+':''}${pd.pct.toFixed(2)}%，超过 60 日波动率 ±${volData[tk].toFixed(2)}%`;
+        }
+      }
+      if(trigger){
+        const msg=`🔔 <b>${tk}</b> 价格预警\n${reason}\n💰 现价: $${fmtP(pd.price)} | 今日: ${pd.pct>=0?'+':''}${pd.pct.toFixed(2)}%\n⏰ ${new Date().toLocaleString('zh-CN')}`;
+        const sent=await sendTelegram(msg);
+        const entry={id:Date.now()+'_'+tk,time:new Date().toISOString(),ticker:tk,price:pd.price,pct:pd.pct,reason,sent};
+        alertLog.unshift(entry);
+        alertCounts[today][tk]=(alertCounts[today][tk]||0)+1;
+        msgs.push(`${dir} ${tk}: ${reason.substring(0,40)}...`);
+        fired++;
+      }
+    }
+    saveState();
+    renderWatchlist();
+    renderAlertLog();
+    renderAlertCount();
+    if(fired>0){
+      showToast(`⚡ 触发 ${fired} 条预警`,msgs.slice(0,3).join('\n'),'amber');
+    }else{
+      showToast('✓ 检查完成','未发现预警条件','success',2500);
+    }
+  }finally{
+    document.getElementById('checkBtn').disabled=false;
+    document.getElementById('checkBtn').textContent='⚡ CHECK ALERTS';
+  }
+}
+
+// ═══════════════════════════════════════════════════
+// TELEGRAM
+// ═══════════════════════════════════════════════════
+async function sendTelegram(text){
+  if(!cfg.tok||!cfg.cid)return false;
+  try{
+    const r=await fetch(`https://api.telegram.org/bot${cfg.tok}/sendMessage`,{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({chat_id:cfg.cid,text,parse_mode:'HTML'})
+    });
+    return r.ok;
+  }catch{return false}
+}
+
+async function testTelegram(){
+  saveCfg();
+  const el=document.getElementById('tgTestResult');
+  el.style.display='inline';el.textContent='发送中...';el.style.color='var(--muted)';
+  const ok=await sendTelegram('🔔 <b>Market Sentinel 测试</b>\n✅ Telegram 推送连接成功！\n⏰ '+new Date().toLocaleString('zh-CN'));
+  if(ok){el.textContent='✓ 发送成功';el.style.color='var(--green)'}
+  else{el.textContent='✗ 失败，检查 Token/Chat ID';el.style.color='var(--red2)'}
+}
+
+// ═══════════════════════════════════════════════════
+// RENDER WATCHLIST
+// ═══════════════════════════════════════════════════
+function renderWatchlist(){
+  const today=getToday();
+  const todayCounts=alertCounts[today]||{};
+  let list=[...stocks];
+  // sort
+  list.sort((a,b)=>{
+    if(sortKey==='t')return a.t.localeCompare(b.t)*sortDir;
+    if(sortKey==='price'){const pa=priceData[a.t]?.price||0,pb=priceData[b.t]?.price||0;return(pa-pb)*sortDir}
+    if(sortKey==='pct'){const pa=priceData[a.t]?.pct||0,pb=priceData[b.t]?.pct||0;return(pa-pb)*sortDir}
+    if(sortKey==='tgt'){const ta=a.tgt||999999,tb=b.tgt||999999;return(ta-tb)*sortDir}
+    return 0;
+  });
+  // filter
+  let filtered=list;
+  if(currentFilter!=='All'){
+    if(currentFilter==='⚠ALERT'){
+      filtered=list.filter(s=>{
+        const pd=priceData[s.t];if(!pd)return false;
+        if(s.tgt)return Math.abs(pd.price-s.tgt)/s.tgt*100<=cfg.thresh;
+        if(volData[s.t])return Math.abs(pd.pct)>volData[s.t];
+        return false;
+      });
+    }else{
+      filtered=list.filter(s=>s.cat===currentFilter);
+    }
+  }
+  const tbody=document.getElementById('watchlistBody');
+  tbody.innerHTML=filtered.map(s=>{
+    const pd=priceData[s.t]||{};
+    const dc=todayCounts[s.t]||0;
+    const atTgt=s.tgt&&pd.price&&Math.abs(pd.price-s.tgt)/s.tgt*100<=cfg.thresh;
+    const vAlert=!s.tgt&&pd.price&&volData[s.t]&&Math.abs(pd.pct)>volData[s.t];
+    const sd=volData[s.t];
+    let statusHtml='<span class="normal-badge">—</span>';
+    if(atTgt)statusHtml=`<span class="vol-badge" style="background:rgba(245,166,35,.15);color:var(--amber)">近目标 ±${cfg.thresh}%</span>`;
+    else if(vAlert)statusHtml=`<span class="vol-badge">高波动 ${pd.pct?.toFixed(1)}%</span>`;
+    const ma20=pd.ma20,ma50=pd.ma50;
+    const ma20class=pd.price&&ma20?(pd.price>ma20?'above-ma':'below-ma'):'ma-val';
+    const ma50class=pd.price&&ma50?(pd.price>ma50?'above-ma':'below-ma'):'ma-val';
+    return `<tr>
+      <td class="ticker-cell">${s.t}</td>
+      <td><span class="cat-badge cat-${s.cat}">${s.cat}</span></td>
+      <td class="price-cell">${pd.price?'$'+fmtP(pd.price):'<span style="color:var(--dim)">—</span>'}</td>
+      <td><span class="${pd.pct>=0?'change-pos':'change-neg'}">${pd.pct!=null?(pd.pct>=0?'▲':'▼')+Math.abs(pd.pct).toFixed(2)+'%':'—'}</span></td>
+      <td class="${ma20class}">${ma20?'$'+fmtP(ma20):'—'}</td>
+      <td class="${ma50class}">${ma50?'$'+fmtP(ma50):'—'}</td>
+      <td class="${atTgt?'tgt-near':'tgt-cell'}" onclick="editTarget('${s.t}')" title="点击编辑目标价" id="tgt_${s.t}">
+        ${s.tgt?'$'+s.tgt:'<span class="tgt-none">——</span>'}
+      </td>
+      <td style="font-size:10px;color:var(--muted)">${sd?'±'+sd.toFixed(2)+'%':'<span style="color:var(--dim)">计算中</span>'}</td>
+      <td>${statusHtml}</td>
+      <td class="alert-count">${dc>0?dc+'/'+cfg.maxAlerts:'<span style="color:var(--dim)">0/'+cfg.maxAlerts+'</span>'}</td>
+      <td><button class="del-btn" onclick="deleteStock('${s.t}')">✕</button></td>
+    </tr>`;
+  }).join('');
+}
+
+function editTarget(ticker){
+  const stock=stocks.find(s=>s.t===ticker);if(!stock)return;
+  const td=document.getElementById('tgt_'+ticker);if(!td)return;
+  const cur=stock.tgt||'';
+  td.innerHTML=`<div class="edit-tgt-wrap">
+    <input class="edit-tgt-input" id="etgt_${ticker}" value="${cur}" placeholder="价格" type="number" step="0.01" autofocus>
+    <button class="save-btn" onclick="saveTarget('${ticker}')">✓</button>
+    <button class="cancel-btn" onclick="renderWatchlist()">✗</button>
+  </div>`;
+  setTimeout(()=>{const i=document.getElementById('etgt_'+ticker);if(i){i.focus();i.addEventListener('keydown',e=>{if(e.key==='Enter')saveTarget(ticker);if(e.key==='Escape')renderWatchlist();})}},50);
+}
+
+function saveTarget(ticker){
+  const inp=document.getElementById('etgt_'+ticker);
+  if(!inp)return;
+  const v=parseFloat(inp.value);
+  stocks=stocks.map(s=>s.t===ticker?{...s,tgt:isNaN(v)?null:v}:s);
+  saveState();
+  renderWatchlist();
+}
+
+function deleteStock(ticker){
+  if(!confirm(`删除 ${ticker}？`))return;
+  stocks=stocks.filter(s=>s.t!==ticker);
+  saveState();
+  renderWatchlist();
+  document.getElementById('countVal').textContent=stocks.length+' 只';
+}
+
+function addStock(){
+  const t=document.getElementById('newTicker').value.trim().toUpperCase();
+  if(!t)return;
+  if(stocks.find(s=>s.t===t)){showToast('⚠ 重复','该股票已在列表中','amber',2000);return;}
+  const tgtV=parseFloat(document.getElementById('newTarget').value);
+  stocks.push({t,cat:'Custom',tgt:isNaN(tgtV)?null:tgtV});
+  document.getElementById('newTicker').value='';
+  document.getElementById('newTarget').value='';
+  saveState();
+  renderWatchlist();
+  document.getElementById('countVal').textContent=stocks.length+' 只';
+  // fetch price immediately
+  fetchPrices([t]).then(p=>{if(p[t]){priceData[t]=p[t];renderWatchlist();}});
+  showToast('✓ 已添加 '+t,'','success',2000);
+}
+
+function importExcel(input){
+  const file=input.files[0];if(!file)return;
+  const reader=new FileReader();
+  reader.onload=e=>{
+    try{
+      const wb=XLSX.read(e.target.result,{type:'binary'});
+      const ws=wb.Sheets[wb.SheetNames[0]];
+      const rows=XLSX.utils.sheet_to_json(ws,{header:1});
+      let added=0;
+      for(let i=1;i<rows.length;i++){
+        const [cat,ticker,,,,,,,,,,,,,] = rows[i];
+        if(!ticker||typeof ticker!=='string')continue;
+        const t=ticker.trim().toUpperCase();
+        if(!t||stocks.find(s=>s.t===t))continue;
+        stocks.push({t,cat:cat||'Custom',tgt:null});
+        added++;
+      }
+      if(added>0){saveState();renderWatchlist();showToast(`✓ 导入成功`,`新增 ${added} 只股票`,'success');}
+      else{showToast('⚠ 无新增','所有股票已在列表中','amber',3000);}
+    }catch(err){showToast('✗ 导入失败','请检查文件格式（需A列=分类，B列=代码）','','3000')}
+  };
+  reader.readAsBinaryString(file);
+  input.value='';
+}
+
+// ═══════════════════════════════════════════════════
+// ALERT LOG RENDER
+// ═══════════════════════════════════════════════════
+function renderAlertLog(){
+  const container=document.getElementById('alertContainer');
+  if(alertLog.length===0){
+    container.innerHTML=`<div class="empty-state"><div class="icon">▣</div><div>暂无预警记录</div><div class="sub">点击 ⚡ CHECK ALERTS 立即检查<br>或等待交易时间内自动检测</div></div>`;
+    return;
+  }
+  container.innerHTML=`
+    <div style="border:1px solid var(--border);border-radius:2px;overflow:hidden">
+      <div class="alert-row header">
+        <span>时间</span><span>代码</span><span>触发价</span><span>原因</span><span>详情</span><span>推送</span>
+      </div>
+      ${alertLog.slice(0,200).map(l=>`
+        <div class="alert-row">
+          <span style="color:var(--muted)">${new Date(l.time).toLocaleString('zh-CN',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'})}</span>
+          <span style="font-weight:600;color:var(--white)">${l.ticker}</span>
+          <span style="color:var(--amber)">$${fmtP(l.price)}</span>
+          <span style="color:var(--muted);font-size:10px;line-height:1.5;white-space:normal">${l.reason}</span>
+          <span style="color:var(--muted);font-size:10px">${l.pct>=0?'<span class="change-pos">▲':'<span class="change-neg">▼'}${Math.abs(l.pct||0).toFixed(2)}%</span></span>
+          <span><span class="sent-badge ${l.sent?'sent-ok':'sent-fail'}">${l.sent?'✓ TG':'✗ 未发'}</span></span>
+        </div>
+      `).join('')}
+    </div>
+  `;
+}
+
+function clearAlertLog(){
+  if(!confirm('清除所有预警记录？'))return;
+  alertLog=[];alertCounts={};
+  saveState();renderAlertLog();renderAlertCount();
+}
+
+function renderAlertCount(){
+  const today=getToday();
+  const total=Object.values(alertCounts[today]||{}).reduce((a,b)=>a+b,0);
+  document.getElementById('alertsToday').textContent=total;
+  document.getElementById('alertBadge').textContent=alertLog.length;
+}
+
+// ═══════════════════════════════════════════════════
+// INDEX SNAPSHOT (SPY, QQQ, DIA)
+// ═══════════════════════════════════════════════════
+async function fetchIndexSnapshot(){
+  try{
+    const idxs=['SPY','QQQ','DIA','^VIX'];
+    const p=await fetchPrices(idxs);
+    const snap=document.getElementById('indexSnap');
+    snap.innerHTML=Object.entries(p).map(([k,v])=>`
+      <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border)">
+        <span style="color:var(--white);font-weight:500">${k}</span>
+        <span>$${fmtP(v.price)}</span>
+        <span class="${v.pct>=0?'change-pos':'change-neg'}">${v.pct>=0?'▲':'▼'}${Math.abs(v.pct).toFixed(2)}%</span>
+      </div>
+    `).join('');
+  }catch{}
+}
+
+async function fetchMarketData(){
+  await Promise.all([fetchCrypto(),fetchFearGreed(),fetchIndexSnapshot()]);
+}
+
+// ═══════════════════════════════════════════════════
+// UI HELPERS
+// ═══════════════════════════════════════════════════
+function switchTab(tab){
+  ['watchlist','market','alerts','settings'].forEach(t=>{
+    document.getElementById('pane-'+t).style.display=t===tab?'block':'none';
+    document.getElementById('tab-'+t).className='tab'+(t===tab?' active':'');
+  });
+  if(tab==='market')fetchMarketData();
+  if(tab==='alerts')renderAlertLog();
+}
+
+function setFilter(cat){
+  currentFilter=cat;
+  document.querySelectorAll('.filter-btn').forEach(b=>b.classList.toggle('active',b.dataset.cat===cat));
+  renderWatchlist();
+}
+
+function sortBy(key){
+  if(sortKey===key)sortDir*=-1;else{sortKey=key;sortDir=1;}
+  renderWatchlist();
+}
+
+function setLoading(on){
+  document.getElementById('loadBar').style.display=on?'block':'none';
+}
+
+function showToast(title,body='',type='amber',duration=4000){
+  const w=document.getElementById('toastWrap');
+  const el=document.createElement('div');
+  el.className='toast'+(type==='success'?' success':type==='error'?' error':'');
+  el.innerHTML=`<strong>${title}</strong>${body?`<div style="font-size:10px;margin-top:4px;color:var(--muted)">${body}</div>`:''}`;
+  w.appendChild(el);
+  setTimeout(()=>el.remove(),duration);
+}
+
+function fmt(n){
+  if(!n)return'—';
+  if(n>=1e9)return'$'+(n/1e9).toFixed(2)+'B';
+  if(n>=1e6)return'$'+(n/1e6).toFixed(2)+'M';
+  if(n>=1000)return n.toLocaleString('en-US',{maximumFractionDigits:2});
+  return n.toFixed(2);
+}
+function fmtP(n){if(!n)return'—';return n>=1000?n.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}):n.toFixed(2)}
+function fmtB(n){if(!n)return'—';if(n>=1e12)return(n/1e12).toFixed(2)+'T';if(n>=1e9)return(n/1e9).toFixed(0)+'B';return(n/1e6).toFixed(0)+'M'}
+function getToday(){return new Date().toISOString().split('T')[0]}
+function delay(ms){return new Promise(r=>setTimeout(r,ms))}
+
+function resetTimer(){
+  if(checkTimer)clearInterval(checkTimer);
+  checkTimer=setInterval(()=>{
+    updateMarketStatus();
+    if(isMarketOpen())doCheck();
+  },(cfg.interval||5)*60*1000);
+}
+
+// ═══════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════
+document.addEventListener('DOMContentLoaded',async()=>{
+  loadState();
+  document.getElementById('countVal').textContent=stocks.length+' 只';
+  updateMarketStatus();
+  renderWatchlist();
+  renderAlertLog();
+  renderAlertCount();
+
+  // Initial data fetch
+  setLoading(true);
+  await doRefresh();
+  fetchCrypto();
+  fetchFearGreed();
+  fetchIndexSnapshot();
+  setLoading(false);
+
+  // Start vol calc in background
+  setTimeout(()=>calcVolatility(),3000);
+
+  // Auto-check timer
+  resetTimer();
+
+  // Refresh crypto every 60s
+  setInterval(fetchCrypto,60000);
+
+  // Market status every 30s
+  setInterval(updateMarketStatus,30000);
+});
+</script>
+</body>
+</html>

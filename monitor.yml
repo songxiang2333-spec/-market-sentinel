@@ -1,0 +1,24 @@
+name: Strategy Master Bot
+on:
+  schedule:
+    - cron: '0 14-22 * * 1-5' # 北京时间晚上 10点到次日 6点，每小时运行 (对应美股开盘)
+  workflow_dispatch: # 允许手动点击运行
+
+jobs:
+  run-bot:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+      - name: Install deps
+        run: pip install yfinance gspread google-auth requests
+      - name: Execute Monitor
+        env:
+          GOOGLE_CREDS: ${{ secrets.GOOGLE_CREDS }}
+          SHEET_ID: ${{ secrets.SHEET_ID }}
+          PUSH_TOKEN: ${{ secrets.PUSH_TOKEN }}
+          PUSH_USER: ${{ secrets.PUSH_USER }}
+        run: python strategy_bot.py
